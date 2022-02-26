@@ -6,7 +6,7 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
-import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import lombok.ToString;
@@ -50,20 +50,27 @@ public class LoadBalancer {
     this.statistics = new Statistics();
   }
 
-  private static Executor createNewCachedThreadPool(int min, int max) {
-    return new ThreadPoolExecutor(min,
-        max,
+  /**
+   * Create cached thread pool.
+   *
+   * @param minThreadCount minimal thread count of the pool.
+   * @param maxThreadCount maximum thread count of the pool.
+   * @return created thread pool.
+   */
+  private static Executor createCachedThreadPool(int minThreadCount, int maxThreadCount) {
+    return new ThreadPoolExecutor(minThreadCount,
+        maxThreadCount,
         60L,
         TimeUnit.SECONDS,
-        new SynchronousQueue<Runnable>());
+        new LinkedBlockingQueue<>());
   }
 
   public synchronized void start() {
 
-    final Executor bossPool = createNewCachedThreadPool(1,
-        Math.max(4, Runtime.getRuntime().availableProcessors() / 4));
-    final Executor workerPool = createNewCachedThreadPool(2,
-        Math.max(4, Runtime.getRuntime().availableProcessors() / 4));
+    int availableCPUCores = Runtime.getRuntime().availableProcessors();
+
+    final Executor bossPool = createCachedThreadPool(0, Math.max(availableCPUCores >> 2, 4));
+    final Executor workerPool = createCachedThreadPool(0, Math.max(availableCPUCores >> 2, 4));
 
     this.bootstrap = new ServerBootstrap(new NioServerSocketChannelFactory(bossPool, workerPool));
     this.clientSocketChannelFactory = new NioClientSocketChannelFactory(bossPool, workerPool);
