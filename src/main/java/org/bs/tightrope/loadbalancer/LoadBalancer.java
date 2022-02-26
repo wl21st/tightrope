@@ -6,6 +6,7 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -67,13 +68,12 @@ public class LoadBalancer {
 
   public synchronized void start() {
 
-    int availableCPUCores = Runtime.getRuntime().availableProcessors();
+    final Executor bossPool = Executors.newCachedThreadPool();
+    final Executor workerPool = Executors.newCachedThreadPool();
 
-    final Executor bossPool = createCachedThreadPool(0, Math.max(availableCPUCores >> 1, 4));
-    final Executor workerPool = createCachedThreadPool(0, Math.max(availableCPUCores, 4));
-
-    this.bootstrap = new ServerBootstrap(new NioServerSocketChannelFactory(bossPool, workerPool));
-    this.clientSocketChannelFactory = new NioClientSocketChannelFactory(bossPool, workerPool);
+    bootstrap = new ServerBootstrap(new NioServerSocketChannelFactory(bossPool, workerPool));
+    final ClientSocketChannelFactory clientSocketChannelFactory = new NioClientSocketChannelFactory(
+        bossPool, workerPool);
 
     bootstrap.setOption("child.tcpNoDelay", true);
     allChannels = new DefaultChannelGroup("handler");
