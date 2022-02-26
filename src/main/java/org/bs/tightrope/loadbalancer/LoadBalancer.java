@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.bs.tightrope.loadbalancer.models.Server;
 import org.bs.tightrope.loadbalancer.models.ServerPool;
@@ -26,20 +27,23 @@ import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
 import org.jboss.netty.channel.socket.nio.NioServerSocketChannelFactory;
 
 @Slf4j
+@ToString
 public class LoadBalancer {
-
-  private static boolean exitFlag = false;
 
   private Channel acceptor;
   private ChannelGroup allChannels;
   private ServerBootstrap bootstrap;
-  private ServerPool serverPool;
-  private int port;
+
+  private ServerPool upstreamServerPool;
+  private int listenPort;
+
+  private boolean exitFlag = false;
+
   private Statistics statistics;
 
-  public LoadBalancer(ServerPool serverPool, int port) {
-    this.serverPool = serverPool;
-    this.port = port;
+  public LoadBalancer(ServerPool upstreamServerPool, int listenPort) {
+    this.upstreamServerPool = upstreamServerPool;
+    this.listenPort = listenPort;
     this.statistics = new Statistics();
   }
 
@@ -58,12 +62,13 @@ public class LoadBalancer {
       @Override
       public ChannelPipeline getPipeline() throws Exception {
         return Channels.pipeline(
-            new FrontendHandler(allChannels, clientSocketChannelFactory, serverPool, statistics));
+            new FrontendHandler(allChannels, clientSocketChannelFactory, upstreamServerPool,
+                statistics));
       }
     });
 
-    log.info("Starting on port {}", port);
-    acceptor = bootstrap.bind(new InetSocketAddress(port));
+    log.info("Starting on port {}", listenPort);
+    acceptor = bootstrap.bind(new InetSocketAddress(listenPort));
 
     if (acceptor.isBound()) {
       log.info("Server started successfully");
@@ -87,6 +92,8 @@ public class LoadBalancer {
     getUpstreamServers().forEach(server -> serverPool.addServer(server));
 
     final LoadBalancer loadBalancer = new LoadBalancer(serverPool, getLoadBalancerListenPort());
+
+    log.info("Start the server with configuration {}", loadBalancer);
 
     loadBalancer.start();
 
@@ -129,7 +136,7 @@ public class LoadBalancer {
   }
 
   private static int getLoadBalancerListenPort() {
-    return Integer.getInteger("lb.port", 9001);
+    return Integer.getInteger("listen.port", 9001);
   }
 
   private static List<Server> getUpstreamServers() {
