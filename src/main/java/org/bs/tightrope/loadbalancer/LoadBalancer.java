@@ -153,7 +153,7 @@ public class LoadBalancer {
   }
 
   private static int getLoadBalancerListenPort() {
-    return Integer.getInteger("listen.port", 9001);
+    return Integer.getInteger("listen.port", 9090);
   }
 
   private static List<Server> getUpstreamServers() {
