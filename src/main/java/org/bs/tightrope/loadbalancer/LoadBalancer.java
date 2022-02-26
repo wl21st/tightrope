@@ -69,8 +69,8 @@ public class LoadBalancer {
 
     int availableCPUCores = Runtime.getRuntime().availableProcessors();
 
-    final Executor bossPool = createCachedThreadPool(0, Math.max(availableCPUCores >> 2, 4));
-    final Executor workerPool = createCachedThreadPool(0, Math.max(availableCPUCores >> 2, 4));
+    final Executor bossPool = createCachedThreadPool(0, Math.max(availableCPUCores >> 1, 4));
+    final Executor workerPool = createCachedThreadPool(0, Math.max(availableCPUCores, 4));
 
     this.bootstrap = new ServerBootstrap(new NioServerSocketChannelFactory(bossPool, workerPool));
     this.clientSocketChannelFactory = new NioClientSocketChannelFactory(bossPool, workerPool);
