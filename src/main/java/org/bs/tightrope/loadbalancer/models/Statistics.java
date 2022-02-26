@@ -2,7 +2,9 @@ package org.bs.tightrope.loadbalancer.models;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import lombok.ToString;
 
+@ToString
 public class Statistics {
 
   private AtomicLong bytesIn;

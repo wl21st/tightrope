@@ -3,10 +3,12 @@ package org.bs.tightrope.loadbalancer.models;
 
 import java.util.ArrayList;
 import java.util.List;
+import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.bs.tightrope.loadbalancer.strategies.LoadBalancerStrategy;
 
 @Slf4j
+@ToString
 public class ServerPool {
 
   private List<Server> servers;
