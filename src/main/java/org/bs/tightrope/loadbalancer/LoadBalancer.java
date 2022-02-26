@@ -98,12 +98,27 @@ public class LoadBalancer {
 
     Runtime.getRuntime().addShutdownHook(shutdownHook);
 
+    int lastConnections = 0;
+    long lastBytesIn = 0L;
     while (!exitFlag) {
       Statistics status = loadBalancer.getStatistics();
-      log.info("{} connections and {} bytes transfered so far", status.getFrontendConnections(),
-          status.getBytesIn());
 
-      sleep(2000);
+      int connections = status.getFrontendConnections();
+      long bytesIn = status.getBytesIn();
+
+      boolean hasProgress = (lastConnections != connections || lastBytesIn != bytesIn);
+
+      if (hasProgress) {
+        log.info("connections={} in traffic={} bytes, connections.diff={}, traffic.diff={} bytes",
+            connections,
+            bytesIn,
+            connections - lastConnections,
+            bytesIn - lastBytesIn);
+      }
+      lastConnections = connections;
+      lastBytesIn = bytesIn;
+
+      sleep(2000L);
     }
 
   }
