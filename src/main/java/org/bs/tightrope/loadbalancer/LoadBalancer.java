@@ -6,7 +6,9 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.bs.tightrope.loadbalancer.models.Server;
@@ -40,6 +42,7 @@ public class LoadBalancer {
   private boolean exitFlag = false;
 
   private Statistics statistics;
+  private ClientSocketChannelFactory clientSocketChannelFactory;
 
   public LoadBalancer(ServerPool upstreamServerPool, int listenPort) {
     this.upstreamServerPool = upstreamServerPool;
@@ -47,13 +50,23 @@ public class LoadBalancer {
     this.statistics = new Statistics();
   }
 
-  public synchronized void start() {
-    final Executor bossPool = Executors.newCachedThreadPool();
-    final Executor workerPool = Executors.newCachedThreadPool();
+  private static Executor createNewCachedThreadPool(int min, int max) {
+    return new ThreadPoolExecutor(min,
+        max,
+        60L,
+        TimeUnit.SECONDS,
+        new SynchronousQueue<Runnable>());
+  }
 
-    bootstrap = new ServerBootstrap(new NioServerSocketChannelFactory(bossPool, workerPool));
-    final ClientSocketChannelFactory clientSocketChannelFactory = new NioClientSocketChannelFactory(
-        bossPool, workerPool);
+  public synchronized void start() {
+
+    final Executor bossPool = createNewCachedThreadPool(1,
+        Math.max(4, Runtime.getRuntime().availableProcessors() / 4));
+    final Executor workerPool = createNewCachedThreadPool(2,
+        Math.max(4, Runtime.getRuntime().availableProcessors() / 4));
+
+    this.bootstrap = new ServerBootstrap(new NioServerSocketChannelFactory(bossPool, workerPool));
+    this.clientSocketChannelFactory = new NioClientSocketChannelFactory(bossPool, workerPool);
 
     bootstrap.setOption("child.tcpNoDelay", true);
     allChannels = new DefaultChannelGroup("handler");
@@ -123,10 +136,7 @@ public class LoadBalancer {
 
       if (hasProgress) {
         log.info("connections={} in traffic={} bytes, connections.diff={}, traffic.diff={} bytes",
-            connections,
-            bytesIn,
-            connections - lastConnections,
-            bytesIn - lastBytesIn);
+            connections, bytesIn, connections - lastConnections, bytesIn - lastBytesIn);
       }
       lastConnections = connections;
       lastBytesIn = bytesIn;
