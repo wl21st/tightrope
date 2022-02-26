@@ -3,6 +3,8 @@ package org.bs.tightrope.loadbalancer;
 import static java.lang.Thread.sleep;
 
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import lombok.extern.slf4j.Slf4j;
@@ -82,10 +84,9 @@ public class LoadBalancer {
     final LoadBalancerStrategy loadBalancerStrategy = new RoundRobinStrategy();
     final ServerPool serverPool = new ServerPool(loadBalancerStrategy);
 
-    serverPool.addServer(new Server("10.0.0.100", 8080));
-    serverPool.addServer(new Server("10.0.0.201", 8080));
+    getUpstreamServers().forEach(server -> serverPool.addServer(server));
 
-    final LoadBalancer loadBalancer = new LoadBalancer(serverPool, 9000);
+    final LoadBalancer loadBalancer = new LoadBalancer(serverPool, getLoadBalancerListenPort());
 
     loadBalancer.start();
 
@@ -98,10 +99,15 @@ public class LoadBalancer {
 
     Runtime.getRuntime().addShutdownHook(shutdownHook);
 
+    loadBalancer.doEventLoop();
+
+  }
+
+  private void doEventLoop() throws InterruptedException {
     int lastConnections = 0;
     long lastBytesIn = 0L;
     while (!exitFlag) {
-      Statistics status = loadBalancer.getStatistics();
+      Statistics status = getStatistics();
 
       int connections = status.getFrontendConnections();
       long bytesIn = status.getBytesIn();
@@ -120,6 +126,31 @@ public class LoadBalancer {
 
       sleep(2000L);
     }
-
   }
+
+  private static int getLoadBalancerListenPort() {
+    return Integer.getInteger("lb.port", 9001);
+  }
+
+  private static List<Server> getUpstreamServers() {
+    String serverCfg = System.getProperty("upstream.servers", "127.0.0.1:8080");
+
+    List<Server> result = new ArrayList<>();
+    for (String serverString : serverCfg.split(",")) {
+      String[] serverParts = serverString.trim().split(":");
+
+      if (serverParts.length != 2) {
+        throw new IllegalArgumentException(
+            "Illegal server input: " + serverCfg + ", expected format is host:port!");
+      }
+
+      String host = serverParts[0];
+      Integer port = Integer.parseInt(serverParts[1]);
+
+      result.add(new Server(host, port));
+    }
+
+    return result;
+  }
+
 }
